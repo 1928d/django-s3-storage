@@ -18,11 +18,7 @@ AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY")
 
 AWS_REGION = os.environ.get("AWS_REGION", "eu-central-1")
 
-AWS_S3_BUCKET_NAME = os.environ.get("AWS_S3_BUCKET_NAME", "1928-django-s3-storage-test")
-
 AWS_S3_KEY_PREFIX = uuid.uuid4().hex
-
-AWS_S3_BUCKET_NAME_STATIC = os.environ.get("AWS_S3_BUCKET_NAME", "1928-django-s3-storage-test")
 
 AWS_S3_KEY_PREFIX_STATIC = uuid.uuid4().hex
 

@@ -109,9 +109,7 @@ class Settings:
     AWS_SECRET_ACCESS_KEY: str = ""
     AWS_SESSION_TOKEN: str = ""
     # default_s3_settings
-    AWS_S3_BUCKET_NAME: str = ""
     AWS_S3_ADDRESSING_STYLE: str = "auto"
-    # "AWS_S3_ENDPOINT_URL": "",
     AWS_S3_ENDPOINTS: dict = field(
         default_factory=lambda: {
             's3': Endpoints(),
@@ -155,8 +153,7 @@ class Settings:
 
     def __post_init__(self):
         # Validate settings.
-        if not self.AWS_S3_BUCKET_NAME:
-            raise ImproperlyConfigured(f"Setting AWS_S3_BUCKET_NAME is required.")
+        pass
 
     @property
     def transfer_config(self):
@@ -554,9 +551,11 @@ class S3Storage(Storage):
     get_created_time = get_accessed_time = get_modified_time
 
     def sync_meta_iter(self):
+        raise NotImplementedError("Not ported to full-url-based S3Storage")
+    
         paginator = self.s3_client().get_paginator("list_objects_v2")
         pages = paginator.paginate(
-            Bucket=self.settings.AWS_S3_BUCKET_NAME,
+            Bucket=BUCKET!,
             Prefix=self.settings.AWS_S3_KEY_PREFIX,
         )
         for page in pages:
@@ -585,7 +584,7 @@ class S3Storage(Storage):
                 self.s3_client().copy_object(
                     ContentType=obj["ContentType"],
                     CopySource={
-                        "Bucket": self.settings.AWS_S3_BUCKET_NAME,
+                        "Bucket": BUCKET!,
                         "Key": self._get_key_name(name),
                     },
                     MetadataDirective="REPLACE",

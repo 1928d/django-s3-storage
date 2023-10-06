@@ -19,7 +19,7 @@ from django_s3_storage.storage import Endpoints, S3Storage
 
 
 def helper_old_to_new_name(name) -> str:
-    return f's3://{S3Storage().settings.AWS_S3_BUCKET_NAME}/{name}'
+    return f's3://1928-django-s3-storage-test/{name}'
 
 
 class TestS3Storage(SimpleTestCase):
@@ -34,7 +34,7 @@ class TestS3Storage(SimpleTestCase):
     @contextmanager
     def save_file(
         self,
-        name=f"s3://{S3Storage().settings.AWS_S3_BUCKET_NAME}/foo.txt",
+        name=f"s3://1928-django-s3-storage-test/foo.txt",
         content=b"foo",
         storage=default_storage,
     ):
@@ -400,13 +400,6 @@ class TestS3Storage(SimpleTestCase):
     def testPublicUrl(self):
         with self.settings(AWS_S3_PUBLIC_URL="/foo/", AWS_S3_BUCKET_AUTH=False):
             self.assertEqual(default_storage.url("bar.txt"), "/foo/bar.txt")
-
-    def testEndpointUrl(self):
-        with self.settings(
-            AWS_S3_ENDPOINT_URL="https://s3.amazonaws.com"
-        ), self.save_file() as name:
-            self.assertEqual(name, "foo.txt")
-            self.assertEqual(default_storage.open(name).read(), b"foo")
 
     def testNonOverwrite(self):
         with self.save_file() as name_1, self.save_file() as name_2:
