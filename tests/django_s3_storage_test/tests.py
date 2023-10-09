@@ -6,7 +6,6 @@ from io import StringIO
 from urllib.parse import urlsplit, urlunsplit
 
 import requests
-from django.contrib.staticfiles.storage import staticfiles_storage
 from django.core.exceptions import ImproperlyConfigured
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
@@ -51,11 +50,6 @@ class TestS3Storage(SimpleTestCase):
         self.assertEqual(S3Storage().settings.AWS_S3_CONTENT_LANGUAGE, "")
         with self.settings(AWS_S3_CONTENT_LANGUAGE="foo"):
             self.assertEqual(S3Storage().settings.AWS_S3_CONTENT_LANGUAGE, "foo")
-
-    # def testSettingsOverwritenBySuffixedSettings(self):
-    #     self.assertEqual(StaticS3Storage().settings.AWS_S3_CONTENT_LANGUAGE, "")
-    #     with self.settings(AWS_S3_CONTENT_LANGUAGE="foo", AWS_S3_CONTENT_LANGUAGE_STATIC="bar"):
-    #         self.assertEqual(StaticS3Storage().settings.AWS_S3_CONTENT_LANGUAGE, "bar")
 
     def testSettingsOverwrittenByKwargs(self):
         self.assertEqual(S3Storage().settings.AWS_S3_CONTENT_LANGUAGE, "")
@@ -302,34 +296,6 @@ class TestS3Storage(SimpleTestCase):
             with self.save_file() as name_1, self.save_file() as name_2:
                 self.assertEqual(name_1, helper_old_to_new_name("foo.txt"))
                 self.assertEqual(name_2, helper_old_to_new_name("foo.txt"))
-
-    # Static storage tests.
-
-    def testStaticSettings(self):
-        self.assertEqual(staticfiles_storage.settings.AWS_S3_BUCKET_AUTH, False)
-
-    # Management commands.
-
-    def testManagementCollectstatic(self):
-        call_command("collectstatic", interactive=False, stdout=StringIO())
-        url = staticfiles_storage.url("foo.css")
-        try:
-            # The non-hashed name should have the default cache control.
-            meta = staticfiles_storage.meta("foo.css")
-            self.assertEqual(meta["CacheControl"], "public,max-age=3600")
-            # The URL should not contain query string authentication.
-            self.assertFalse(urlsplit(url).query)
-            # The URL should contain an MD5 hash.
-            self.assertRegex(url, r"foo\.[0-9a-f]{12}\.css$")
-            # The hashed name should be accessible and have a huge cache control.
-            response = requests.get(url)
-            self.assertEqual(response.status_code, 200)
-            self.assertEqual(response.content, b"* { display: none; }\n")
-            self.assertEqual(response.headers["cache-control"], "public,max-age=31536000")
-        finally:
-            staticfiles_storage.delete("staticfiles.json")
-            staticfiles_storage.delete("foo.css")
-            staticfiles_storage.delete(posixpath.basename(url))
 
     def testClientConfig(self):
         storage = S3Storage()

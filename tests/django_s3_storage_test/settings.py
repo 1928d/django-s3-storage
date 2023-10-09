@@ -20,11 +20,7 @@ AWS_REGION = os.environ.get("AWS_REGION", "eu-central-1")
 
 AWS_S3_KEY_PREFIX = uuid.uuid4().hex
 
-AWS_S3_KEY_PREFIX_STATIC = uuid.uuid4().hex
-
 DEFAULT_FILE_STORAGE = "django_s3_storage.storage.S3Storage"
-
-STATICFILES_STORAGE = "django_s3_storage.storage.ManifestStaticS3Storage"
 
 DEBUG = True
 
