@@ -17,7 +17,6 @@ from botocore.client import Config
 from boto3.s3.transfer import TransferConfig
 from botocore.exceptions import ClientError
 from django.conf import settings
-from django.contrib.staticfiles.storage import ManifestFilesMixin
 from django.core import checks
 from django.core.exceptions import ImproperlyConfigured
 from django.core.files.base import File
@@ -184,8 +183,6 @@ class S3Storage(Storage):
     """
     An implementation of Django file storage over S3.
     """
-
-    s3_settings_suffix = ""
 
     def _setup(self):
         self.settings = Settings.from_kwargs_and_django_settings(self._kwargs_settings, settings)
@@ -549,36 +546,3 @@ class S3Storage(Storage):
         return timestamp if settings.USE_TZ else make_naive(timestamp)
 
     get_created_time = get_accessed_time = get_modified_time
-
-
-# class StaticS3Storage(S3Storage):
-
-#     """
-#     An S3 storage for storing static files.
-#     """
-
-#     default_s3_settings = S3Storage.default_s3_settings.copy()
-#     default_s3_settings.update(
-#         {
-#             "AWS_S3_BUCKET_AUTH": False,
-#         }
-#     )
-
-#     s3_settings_suffix = "_STATIC"
-
-
-# class ManifestStaticS3Storage(ManifestFilesMixin, StaticS3Storage):
-#     default_s3_settings = StaticS3Storage.default_s3_settings.copy()
-#     default_s3_settings.update(
-#         {
-#             "AWS_S3_MAX_AGE_SECONDS_CACHED": 60 * 60 * 24 * 365,  # 1 year.
-#         }
-#     )
-
-#     def post_process(self, *args, **kwargs):
-#         initial_aws_s3_max_age_seconds = self.settings.AWS_S3_MAX_AGE_SECONDS
-#         self.settings.AWS_S3_MAX_AGE_SECONDS = self.settings.AWS_S3_MAX_AGE_SECONDS_CACHED
-#         try:
-#             yield from super().post_process(*args, **kwargs)
-#         finally:
-#             self.settings.AWS_S3_MAX_AGE_SECONDS = initial_aws_s3_max_age_seconds
