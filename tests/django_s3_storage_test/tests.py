@@ -288,115 +288,6 @@ class TestS3Storage(SimpleTestCase):
                 default_storage.listdir(helper_old_to_new_name("bar/")), ([], ["bat.txt"])
             )
 
-    def testSyncMeta(self):
-        content = b"foo" * 1000
-        with self.settings(AWS_S3_GZIP=False):
-            with self.save_file(name="foo/bar.txt", content=content):
-                meta = default_storage.meta(helper_old_to_new_name("foo/bar.txt"))
-                self.assertEqual(meta["CacheControl"], "private,max-age=3600")
-                self.assertEqual(meta["ContentType"], "text/plain")
-                self.assertEqual(meta.get("ContentDisposition"), None)
-                self.assertEqual(meta.get("ContentLanguage"), None)
-                self.assertNotIn("uncompressed_size", meta["Metadata"])
-                self.assertEqual(meta.get("StorageClass"), None)
-                self.assertEqual(meta.get("ServerSideEncryption"), "AES256")
-                # Store new metadata.
-                with self.settings(
-                    # AWS_S3_BUCKET_AUTH=False,
-                    AWS_S3_MAX_AGE_SECONDS=9999,
-                    AWS_S3_CONTENT_DISPOSITION=lambda name: f"attachment; filename={name}",
-                    AWS_S3_CONTENT_LANGUAGE="eo",
-                    AWS_S3_METADATA={
-                        "foo": "bar",
-                        "baz": lambda name: name,
-                    },
-                    AWS_S3_REDUCED_REDUNDANCY=True,
-                    AWS_S3_ENCRYPT_KEY=True,
-                ):
-                    default_storage.sync_meta()
-                # Check metadata changed.
-                meta = default_storage.meta(helper_old_to_new_name("foo/bar.txt"))
-                self.assertEqual(meta["CacheControl"], "public,max-age=9999")
-                self.assertEqual(meta["ContentType"], "text/plain")
-                self.assertEqual(meta.get("ContentDisposition"), "attachment; filename=foo/bar.txt")
-                self.assertEqual(meta.get("ContentLanguage"), "eo")
-                self.assertEqual(
-                    meta.get("Metadata"),
-                    {
-                        "foo": "bar",
-                        "baz": "foo/bar.txt",
-                    },
-                )
-                self.assertEqual(meta["StorageClass"], "REDUCED_REDUNDANCY")
-                self.assertEqual(meta["ServerSideEncryption"], "AES256")
-                # Check ACL changed by removing the query string.
-                url_unauthenticated = urlunsplit(
-                    urlsplit(default_storage.url("foo/bar.txt"))[:3]
-                    + (
-                        "",
-                        "",
-                    )
-                )
-                response = requests.get(url_unauthenticated)
-                self.assertEqual(response.status_code, 200)
-                self.assertEqual(response.content, b"foo" * 1000)
-
-    def testSyncMetaWithGzip(self):
-        content = b"foo" * 1000
-        with self.settings(AWS_S3_GZIP=True):
-            with self.save_file(name="foo/bar.txt", content=content):
-                meta = default_storage.meta("foo/bar.txt")
-                self.assertEqual(meta["CacheControl"], "private,max-age=3600")
-                self.assertEqual(meta["ContentType"], "text/plain")
-                self.assertEqual(meta["ContentEncoding"], "gzip")
-                self.assertEqual(meta.get("ContentDisposition"), None)
-                self.assertEqual(meta.get("ContentLanguage"), None)
-                self.assertEqual(meta["Metadata"], {"uncompressed_size": str(len(content))})
-                self.assertEqual(meta.get("StorageClass"), None)
-                self.assertEqual(meta.get("ServerSideEncryption"), "AES256")
-                # Store new metadata.
-                with self.settings(
-                    AWS_S3_BUCKET_AUTH=False,
-                    AWS_S3_MAX_AGE_SECONDS=9999,
-                    AWS_S3_CONTENT_DISPOSITION=lambda name: f"attachment; filename={name}",
-                    AWS_S3_CONTENT_LANGUAGE="eo",
-                    AWS_S3_METADATA={
-                        "foo": "bar",
-                        "baz": lambda name: name,
-                    },
-                    AWS_S3_REDUCED_REDUNDANCY=True,
-                    AWS_S3_ENCRYPT_KEY=True,
-                ):
-                    default_storage.sync_meta()
-                # Check metadata changed.
-                meta = default_storage.meta("foo/bar.txt")
-                self.assertEqual(meta["CacheControl"], "public,max-age=9999")
-                self.assertEqual(meta["ContentType"], "text/plain")
-                self.assertEqual(meta["ContentEncoding"], "gzip")
-                self.assertEqual(meta.get("ContentDisposition"), "attachment; filename=foo/bar.txt")
-                self.assertEqual(meta.get("ContentLanguage"), "eo")
-                self.assertEqual(
-                    meta.get("Metadata"),
-                    {
-                        "foo": "bar",
-                        "baz": "foo/bar.txt",
-                        "uncompressed_size": str(len(content)),
-                    },
-                )
-                self.assertEqual(meta["StorageClass"], "REDUCED_REDUNDANCY")
-                self.assertEqual(meta["ServerSideEncryption"], "AES256")
-                # Check ACL changed by removing the query string.
-                url_unauthenticated = urlunsplit(
-                    urlsplit(default_storage.url("foo/bar.txt"))[:3]
-                    + (
-                        "",
-                        "",
-                    )
-                )
-                response = requests.get(url_unauthenticated)
-                self.assertEqual(response.status_code, 200)
-                self.assertEqual(response.content, b"foo" * 1000)
-
     def testPublicUrl(self):
         with self.settings(AWS_S3_PUBLIC_URL="/foo/", AWS_S3_BUCKET_AUTH=False):
             self.assertEqual(default_storage.url("bar.txt"), "/foo/bar.txt")
@@ -418,22 +309,6 @@ class TestS3Storage(SimpleTestCase):
         self.assertEqual(staticfiles_storage.settings.AWS_S3_BUCKET_AUTH, False)
 
     # Management commands.
-
-    def testManagementS3SyncMeta(self):
-        with self.save_file():
-            # Store new metadata.
-            with self.settings(AWS_S3_MAX_AGE_SECONDS=9999):
-                call_command(
-                    "s3_sync_meta", "django.core.files.storage.default_storage", stdout=StringIO()
-                )
-            # Check metadata changed.
-            meta = default_storage.meta("foo.txt")
-            self.assertEqual(meta["CacheControl"], "private,max-age=9999")
-
-    def testManagementS3SyncMetaUnknownStorage(self):
-        self.assertRaises(
-            CommandError, lambda: call_command("s3_sync_meta", "foo.bar", stdout=StringIO())
-        )
 
     def testManagementCollectstatic(self):
         call_command("collectstatic", interactive=False, stdout=StringIO())

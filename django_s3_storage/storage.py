@@ -550,52 +550,6 @@ class S3Storage(Storage):
 
     get_created_time = get_accessed_time = get_modified_time
 
-    def sync_meta_iter(self):
-        raise NotImplementedError("Not ported to full-url-based S3Storage")
-    
-        paginator = self.s3_client().get_paginator("list_objects_v2")
-        pages = paginator.paginate(
-            Bucket=BUCKET!,
-            Prefix=self.settings.AWS_S3_KEY_PREFIX,
-        )
-        for page in pages:
-            for entry in page.get("Contents", ()):
-                name = posixpath.relpath(entry["Key"], self.settings.AWS_S3_KEY_PREFIX)
-                try:
-                    obj = self.meta(name)
-                except OSError:
-                    # This may be caused by a race condition, with the entry being deleted before it was accessed.
-                    # Alternatively, the key may be something that, when normalized, has a different path, which will
-                    # mean that the key's meta cannot be accessed.
-                    continue
-                put_params = self._object_put_params(name)
-                # Set content encoding.
-                content_encoding = obj.get("ContentEncoding")
-                if content_encoding:
-                    put_params["ContentEncoding"] = content_encoding
-                    if content_encoding == "gzip":
-                        try:
-                            put_params["Metadata"][_UNCOMPRESSED_SIZE_META_KEY] = obj["Metadata"][
-                                _UNCOMPRESSED_SIZE_META_KEY
-                            ]
-                        except KeyError:
-                            pass
-                # Update the metadata.
-                self.s3_client().copy_object(
-                    ContentType=obj["ContentType"],
-                    CopySource={
-                        "Bucket": BUCKET!,
-                        "Key": self._get_key_name(name),
-                    },
-                    MetadataDirective="REPLACE",
-                    **put_params,
-                )
-                yield name
-
-    def sync_meta(self):
-        for path in self.sync_meta_iter():
-            pass
-
 
 # class StaticS3Storage(S3Storage):
 
