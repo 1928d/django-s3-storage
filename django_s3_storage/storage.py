@@ -115,9 +115,7 @@ class Settings:
         }
     )
     AWS_S3_KEY_PREFIX: str = ""
-    AWS_S3_BUCKET_AUTH: bool = True
     AWS_S3_MAX_AGE_SECONDS: int = 60 * 60  # 1 hours.
-    AWS_S3_PUBLIC_URL: str = ""
     AWS_S3_REDUCED_REDUNDANCY: bool = False
     AWS_S3_CONTENT_DISPOSITION: str = ""
     AWS_S3_CONTENT_LANGUAGE: str = ""
@@ -238,24 +236,9 @@ class S3Storage(Storage):
 
         # Re-initialize the storage if an AWS setting changes.
         setting_changed.connect(self._setting_changed_received)
-        # Register system checks.
-        checks.register(partial(self.__class__._system_checks, self), checks.Tags.security)
+
         # All done!
         super().__init__()
-
-    def _system_checks(self, app_configs, **kwargs):
-        errors = []
-        if self.settings.AWS_S3_PUBLIC_URL and self.settings.AWS_S3_BUCKET_AUTH:
-            errors.append(
-                checks.Warning(
-                    f"Using AWS_S3_BUCKET_AUTH{self.s3_settings_suffix} "
-                    f"with AWS_S3_PUBLIC_URL{self.s3_settings_suffix}. "
-                    "Private files on S3 may be inaccessible via the public URL. "
-                    "See https://github.com/etianen/django-s3-storage/issues/114 ",
-                    id="django_s3_storage.W001",
-                )
-            )
-        return errors
 
     def __reduce__(self):
         return unpickle_helper, (self.__class__, self._kwargs_settings)
@@ -285,9 +268,8 @@ class S3Storage(Storage):
     def _object_put_params(self, name):
         # Set basic params.
         params = {
-            "ACL": "private" if self.settings.AWS_S3_BUCKET_AUTH else "public-read",
             "CacheControl": "{privacy},max-age={max_age}".format(
-                privacy="private" if self.settings.AWS_S3_BUCKET_AUTH else "public",
+                privacy="private",
                 max_age=self.settings.AWS_S3_MAX_AGE_SECONDS,
             ),
             "Metadata": {
@@ -506,13 +488,6 @@ class S3Storage(Storage):
             return meta["ContentLength"]
 
     def url(self, name, extra_params=None, client_method="get_object"):
-        # Use a public URL, if specified.
-        if self.settings.AWS_S3_PUBLIC_URL:
-            if extra_params or client_method != "get_object":
-                raise ValueError(
-                    "Use of extra_params or client_method is not allowed with AWS_S3_PUBLIC_URL"
-                )
-            return urljoin(self.settings.AWS_S3_PUBLIC_URL, filepath_to_uri(name))
         # Otherwise, generate the URL.
         params = extra_params.copy() if extra_params else {}
         params.update(self._object_params(name))
@@ -522,19 +497,6 @@ class S3Storage(Storage):
             Params=params,
             ExpiresIn=self.settings.AWS_S3_MAX_AGE_SECONDS,
         )
-        # Strip off the query params if we're not interested in bucket auth.
-        if not self.settings.AWS_S3_BUCKET_AUTH:
-            if extra_params or client_method != "get_object":
-                raise ValueError(
-                    "Use of extra_params or client_method is not allowed with AWS_S3_BUCKET_AUTH"
-                )
-            url = urlunsplit(
-                urlsplit(url)[:3]
-                + (
-                    "",
-                    "",
-                )
-            )
         # All done!
         return url
 
