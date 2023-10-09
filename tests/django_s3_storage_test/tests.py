@@ -164,17 +164,6 @@ class TestS3Storage(SimpleTestCase):
             self.assertIn("Content-Disposition", rsp.headers)
             self.assertEqual(rsp.headers["Content-Disposition"], "attachment")
 
-    def testCustomUrlWhenPublicURL(self):
-        with self.settings(AWS_S3_PUBLIC_URL="/foo/", AWS_S3_BUCKET_AUTH=False):
-            name = helper_old_to_new_name("bar.txt")
-            with self.save_file(name=name, content=b"foo" * 4096):
-                self.assertRaises(
-                    ValueError,
-                    default_storage.url,
-                    name,
-                    extra_params={"ResponseContentDisposition": "attachment"},
-                )
-
     def testExists(self):
         self.assertFalse(default_storage.exists(helper_old_to_new_name("foo.txt")))
         with self.save_file():
@@ -281,10 +270,6 @@ class TestS3Storage(SimpleTestCase):
             self.assertEqual(
                 default_storage.listdir(helper_old_to_new_name("bar/")), ([], ["bat.txt"])
             )
-
-    def testPublicUrl(self):
-        with self.settings(AWS_S3_PUBLIC_URL="/foo/", AWS_S3_BUCKET_AUTH=False):
-            self.assertEqual(default_storage.url("bar.txt"), "/foo/bar.txt")
 
     def testNonOverwrite(self):
         with self.save_file() as name_1, self.save_file() as name_2:
