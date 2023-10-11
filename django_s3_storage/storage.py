@@ -128,6 +128,7 @@ class Settings:
     AWS_S3_USE_THREADS: bool = True
     AWS_S3_MAX_POOL_CONNECTIONS: int = 10
     AWS_S3_CONNECT_TIMEOUT: int = 60  # 60 seconds
+    AWS_S3_BUCKET_NAME: str = 'Deprecated'
 
     @classmethod
     def from_kwargs_and_django_settings(cls, kwargs_settings, django_settings):
