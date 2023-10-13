@@ -10,7 +10,7 @@ from functools import wraps, partial
 from io import TextIOBase
 from tempfile import SpooledTemporaryFile
 from threading import local
-from urllib.parse import urljoin, urlsplit, urlunsplit
+from urllib.parse import urlsplit
 
 import boto3
 from botocore.client import Config
@@ -97,6 +97,12 @@ _UNCOMPRESSED_SIZE_META_KEY = "uncompressed_size"
 
 class StorageIsReadOnlyMode(Exception):
     """The storage is configured to be read only"""
+
+    pass
+
+
+class NotAS3Url(Exception):
+    """The filename does not comply with S3 URL format"""
 
     pass
 
@@ -413,6 +419,18 @@ class S3Storage(Storage):
         if self.settings.AWS_S3_FILE_OVERWRITE:
             return _to_posix_path(name)
         return super().get_available_name(name, max_length=max_length)
+
+    def validate_s3_path(self, s3_path: str):
+        url_split = urlsplit(s3_path)
+        ok_schema = (
+            url_split.scheme in self._clients.keys()
+            or url_split.scheme in self._clients_presigning.keys()
+        )
+        ok_bucket = url_split.netloc != ''
+        if not ok_schema or not ok_bucket:
+            raise NotAS3Url(
+                f"The filename {s3_path} is not a full S3 URL. Have you forgotten to set 'upload_to' on the FileField?"
+            )
 
     @_wrap_path_impl
     def generate_filename(self, filename):
