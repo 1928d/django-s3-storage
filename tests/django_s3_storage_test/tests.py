@@ -14,7 +14,7 @@ from django.test import SimpleTestCase
 from django.utils import timezone
 from django.utils.timezone import is_naive, make_naive, utc
 
-from django_s3_storage.storage import Endpoints, S3Storage
+from django_s3_storage.storage import Endpoints, S3Storage, StorageIsReadOnly
 
 
 def helper_old_to_new_name(name) -> str:
@@ -85,9 +85,23 @@ class TestS3Storage(SimpleTestCase):
             handle.open()
             self.assertEqual(handle.read(), b"foo")
 
+            # Open is working in read only mode
+            with self.settings(AWS_S3_READ_ONLY=True):
+                handle_ro = default_storage.open(name)
+                self.assertEqual(handle_ro.read(), b"foo")
+
     def testSaveTextMode(self):
         with self.save_file(content=b"foo"):
             self.assertEqual(default_storage.open(helper_old_to_new_name("foo.txt")).read(), b"foo")
+
+    def testSaveIfReadOnly(self):
+        with self.settings(AWS_S3_READ_ONLY=True):
+            name = helper_old_to_new_name("foo.txt")
+            self.assertRaises(
+                StorageIsReadOnly,
+                lambda: default_storage.save(name, ContentFile("content", name)),
+            )
+            self.assertFalse(default_storage.exists(name))
 
     def testSaveGzipped(self):
         # Tiny files are not gzipped.
@@ -170,6 +184,10 @@ class TestS3Storage(SimpleTestCase):
             self.assertTrue(default_storage.exists(helper_old_to_new_name("foo.txt")))
             self.assertFalse(default_storage.exists(helper_old_to_new_name("fo")))
 
+            # Exist is working in read only mode
+            with self.settings(AWS_S3_READ_ONLY=True):
+                self.assertTrue(default_storage.exists(helper_old_to_new_name("foo.txt")))
+
     def testExistsDir(self):
         self.assertFalse(default_storage.exists(helper_old_to_new_name("foo/")))
         name = helper_old_to_new_name("foo/bar.txt")
@@ -194,7 +212,17 @@ class TestS3Storage(SimpleTestCase):
         with self.save_file():
             self.assertTrue(default_storage.exists(helper_old_to_new_name("foo.txt")))
             default_storage.delete(helper_old_to_new_name("foo.txt"))
-        self.assertFalse(default_storage.exists(helper_old_to_new_name("foo.txt")))
+            self.assertFalse(default_storage.exists(helper_old_to_new_name("foo.txt")))
+
+    def testDeleteIfReadOnly(self):
+        with self.save_file():
+            self.assertTrue(default_storage.exists(helper_old_to_new_name("foo.txt")))
+            with self.settings(AWS_S3_READ_ONLY=True):
+                self.assertRaises(
+                    StorageIsReadOnly,
+                    lambda: default_storage.delete(helper_old_to_new_name("foo.txt")),
+                )
+                self.assertTrue(default_storage.exists(helper_old_to_new_name("foo.txt")))
 
     def testCopy(self):
         with self.save_file():
@@ -204,6 +232,7 @@ class TestS3Storage(SimpleTestCase):
             )
             self.assertTrue(default_storage.exists(helper_old_to_new_name("foo.txt")))
         self.assertTrue(default_storage.exists(helper_old_to_new_name("bar.txt")))
+        default_storage.delete(helper_old_to_new_name("bar.txt"))
 
     def testRename(self):
         with self.save_file():
@@ -213,6 +242,20 @@ class TestS3Storage(SimpleTestCase):
             )
             self.assertFalse(default_storage.exists(helper_old_to_new_name("foo.txt")))
         self.assertTrue(default_storage.exists(helper_old_to_new_name("bar.txt")))
+        default_storage.delete(helper_old_to_new_name("bar.txt"))
+
+    def testRenameIfReadOnly(self):
+        with self.save_file():
+            self.assertTrue(default_storage.exists(helper_old_to_new_name("foo.txt")))
+            with self.settings(AWS_S3_READ_ONLY=True):
+                self.assertRaises(
+                    StorageIsReadOnly,
+                    lambda: default_storage.rename(
+                        helper_old_to_new_name("foo.txt"), helper_old_to_new_name("bar.txt")
+                    ),
+                )
+            self.assertTrue(default_storage.exists(helper_old_to_new_name("foo.txt")))
+        self.assertFalse(default_storage.exists(helper_old_to_new_name("bar.txt")))
 
     def testModifiedTime(self):
         with self.save_file():

@@ -77,11 +77,28 @@ def _wrap_path_impl(func):
     return do_wrap_path_impl
 
 
+def _read_only_protect(func):
+    @wraps(func)
+    def check_if_read_only(self, *args, **kwargs):
+        if self.settings.AWS_S3_READ_ONLY:
+            raise StorageIsReadOnlyMode
+
+        return func(self, *args, **kwargs)
+
+    return check_if_read_only
+
+
 def unpickle_helper(cls, kwargs):
     return cls(**kwargs)
 
 
 _UNCOMPRESSED_SIZE_META_KEY = "uncompressed_size"
+
+
+class StorageIsReadOnlyMode(Exception):
+    """The storage is configured to be read only"""
+
+    pass
 
 
 class S3File(File):
@@ -129,6 +146,7 @@ class Settings:
     AWS_S3_MAX_POOL_CONNECTIONS: int = 10
     AWS_S3_CONNECT_TIMEOUT: int = 60  # 60 seconds
     AWS_S3_BUCKET_NAME: str = 'Deprecated'
+    AWS_S3_READ_ONLY: bool = False
 
     @classmethod
     def from_kwargs_and_django_settings(cls, kwargs_settings, django_settings):
@@ -316,6 +334,7 @@ class S3Storage(Storage):
         # All done!
         return S3File(content, name, self)
 
+    @_read_only_protect
     @_wrap_errors
     def _save(self, name, content):
         put_params = self._object_put_params(name)
@@ -397,6 +416,7 @@ class S3Storage(Storage):
 
     @_wrap_path_impl
     def generate_filename(self, filename):
+        self.validate_s3_path(filename)
         url_split = urlsplit(filename)
         path = super().generate_filename(url_split.path)
         return url_split._replace(path=path).geturl()
@@ -407,6 +427,7 @@ class S3Storage(Storage):
         schema = self._schema(name)
         return self.s3_client(schema).head_object(**self._object_params(name))
 
+    @_read_only_protect
     @_wrap_errors
     def delete(self, name):
         schema = self._schema(name)
@@ -419,6 +440,7 @@ class S3Storage(Storage):
             CopySource=self._object_params(src_name), **self._object_params(dst_name)
         )
 
+    @_read_only_protect
     @_wrap_errors
     def rename(self, src_name, dst_name):
         self.copy(src_name, dst_name)

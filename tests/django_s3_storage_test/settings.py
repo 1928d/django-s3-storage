@@ -26,11 +26,7 @@ DEBUG = True
 
 # Application definition
 
-INSTALLED_APPS = (
-    # "django.contrib.staticfiles",
-    "django_s3_storage",
-    "django_s3_storage_test_app",
-)
+INSTALLED_APPS = ("django_s3_storage",)
 
 
 # Database
