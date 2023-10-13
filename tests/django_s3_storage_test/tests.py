@@ -11,7 +11,7 @@ from django.test import SimpleTestCase
 from django.utils import timezone
 from django.utils.timezone import is_naive, make_naive, utc
 
-from django_s3_storage.storage import Endpoints, S3Storage, StorageIsReadOnly
+from django_s3_storage.storage import Endpoints, S3Storage, StorageIsReadOnlyModeError
 
 
 def helper_old_to_new_name(name) -> str:
@@ -90,7 +90,7 @@ class TestS3Storage(SimpleTestCase):
         with self.settings(AWS_S3_READ_ONLY=True):
             name = helper_old_to_new_name("foo.txt")
             self.assertRaises(
-                StorageIsReadOnly,
+                StorageIsReadOnlyModeError,
                 lambda: default_storage.save(name, ContentFile("content", name)),
             )
             self.assertFalse(default_storage.exists(name))
@@ -211,7 +211,7 @@ class TestS3Storage(SimpleTestCase):
             self.assertTrue(default_storage.exists(helper_old_to_new_name("foo.txt")))
             with self.settings(AWS_S3_READ_ONLY=True):
                 self.assertRaises(
-                    StorageIsReadOnly,
+                    StorageIsReadOnlyModeError,
                     lambda: default_storage.delete(helper_old_to_new_name("foo.txt")),
                 )
                 self.assertTrue(default_storage.exists(helper_old_to_new_name("foo.txt")))
@@ -241,7 +241,7 @@ class TestS3Storage(SimpleTestCase):
             self.assertTrue(default_storage.exists(helper_old_to_new_name("foo.txt")))
             with self.settings(AWS_S3_READ_ONLY=True):
                 self.assertRaises(
-                    StorageIsReadOnly,
+                    StorageIsReadOnlyModeError,
                     lambda: default_storage.rename(
                         helper_old_to_new_name("foo.txt"), helper_old_to_new_name("bar.txt")
                     ),

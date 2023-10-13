@@ -5,6 +5,7 @@ import os
 import posixpath
 import shutil
 from contextlib import closing
+from dataclasses import dataclass, field, fields
 from datetime import timezone
 from functools import wraps
 from io import TextIOBase
@@ -27,16 +28,6 @@ from django.utils.timezone import make_naive
 log = logging.getLogger(__name__)
 
 
-from dataclasses import dataclass, field, fields
-
-
-@deconstructible
-@dataclass
-class Endpoints:
-    endpoint_url: str | None = None
-    endpoint_url_presigning: str | None = None
-
-
 def _wrap_errors(func):
     @wraps(func)
     def _do_wrap_errors(self, name, *args, **kwargs):
@@ -44,10 +35,10 @@ def _wrap_errors(func):
             return func(self, name, *args, **kwargs)
         except ClientError as ex:
             code = ex.response.get("Error", {}).get("Code", "Unknown")
-            err_cls = OSError
+            msg = f"S3Storage error at {name!r}: {force_str(ex)}"
             if code == "NoSuchKey":
-                err_cls = FileNotFoundError
-            raise err_cls(f"S3Storage error at {name!r}: {force_str(ex)}")
+                raise FileNotFoundError(msg) from ex
+            raise OSError(msg) from ex
 
     return _do_wrap_errors
 
@@ -79,7 +70,7 @@ def _read_only_protect(func):
     @wraps(func)
     def check_if_read_only(self, *args, **kwargs):
         if self.settings.AWS_S3_READ_ONLY:
-            raise StorageIsReadOnlyMode
+            raise StorageIsReadOnlyModeError
 
         return func(self, *args, **kwargs)
 
@@ -93,23 +84,23 @@ def unpickle_helper(cls, kwargs):
 _UNCOMPRESSED_SIZE_META_KEY = "uncompressed_size"
 
 
-class StorageIsReadOnlyMode(Exception):
-    """The storage is configured to be read only"""
+@deconstructible
+@dataclass
+class Endpoints:
+    endpoint_url: str | None = None
+    endpoint_url_presigning: str | None = None
 
-    pass
+
+class StorageIsReadOnlyModeError(Exception):
+    """The storage is configured to be read only."""
 
 
-class NotAS3Url(Exception):
-    """The filename does not comply with S3 URL format"""
-
-    pass
+class NotAS3UrlError(Exception):
+    """The filename does not comply with S3 URL format."""
 
 
 class S3File(File):
-
-    """
-    A file returned from Amazon S3.
-    """
+    """A file returned from Amazon S3."""
 
     def __init__(self, file, name, storage):
         super().__init__(file, name)
@@ -196,10 +187,7 @@ class Settings:
 
 @deconstructible
 class S3Storage(Storage):
-
-    """
-    An implementation of Django file storage over S3.
-    """
+    """An implementation of Django file storage over S3."""
 
     def _setup(self):
         self.settings = Settings.from_kwargs_and_django_settings(self._kwargs_settings, settings)
@@ -207,8 +195,8 @@ class S3Storage(Storage):
         self._clients = {}
         self._clients_presigning = {}
 
-        for schema, endpoints in self.settings.AWS_S3_ENDPOINTS.items():
-            endpoints: Endpoints = endpoints
+        for schema, _endpoints in self.settings.AWS_S3_ENDPOINTS.items():
+            endpoints: Endpoints = _endpoints
 
             # Primary client
             client_settings = self.settings.boto3_client_kwargs()
@@ -242,9 +230,10 @@ class S3Storage(Storage):
     def __init__(self, **kwargs):
         # Check for unknown kwargs.
         settings_keys = {f.name for f in fields(Settings)}
-        for kwarg_key in kwargs.keys():
+        for kwarg_key in kwargs:
             if kwarg_key.upper() not in settings_keys:
-                raise ImproperlyConfigured(f"Unknown S3Storage parameters: {kwarg_key}")
+                msg = f"Unknown S3Storage parameters: {kwarg_key}"
+                raise ImproperlyConfigured(msg)
 
         self._kwargs_settings = kwargs
 
@@ -270,25 +259,22 @@ class S3Storage(Storage):
         if name.startswith("/"):
             name = name[1:]
         return posixpath.normpath(
-            posixpath.join(self.settings.AWS_S3_KEY_PREFIX, _to_posix_path(name))
+            posixpath.join(self.settings.AWS_S3_KEY_PREFIX, _to_posix_path(name)),
         )
 
     def _object_params(self, name):
         url_split = urlsplit(name)
-        assert url_split.netloc and url_split.netloc != ''
-        params = {
+        if not url_split.netloc or url_split.netloc == '':
+            raise RuntimeError
+        return {
             "Bucket": url_split.netloc,
             "Key": self._get_key_name(url_split.path),
         }
-        return params
 
     def _object_put_params(self, name):
         # Set basic params.
         params = {
-            "CacheControl": "{privacy},max-age={max_age}".format(
-                privacy="private",
-                max_age=self.settings.AWS_S3_MAX_AGE_SECONDS,
-            ),
+            "CacheControl": f"private,max-age={self.settings.AWS_S3_MAX_AGE_SECONDS}",
             "Metadata": {
                 key: _callable_setting(value, name)
                 for key, value in self.settings.AWS_S3_METADATA.items()
@@ -318,13 +304,14 @@ class S3Storage(Storage):
         return params
 
     def new_temporary_file(self):
-        """Returns a new file to use when opening from or saving to S3"""
+        """Return a new file to use when opening from or saving to S3."""
         return SpooledTemporaryFile(max_size=1024 * 1024 * 10)  # 10 MB.
 
     @_wrap_errors
     def _open(self, name, mode="rb"):
         if mode != "rb":
-            raise ValueError("S3 files can only be opened in read-only mode")
+            msg = "S3 files can only be opened in read-only mode"
+            raise ValueError(msg)
         # Load the key into a temporary file. It would be nice to stream the
         # content, but S3 doesn't support seeking, which is sometimes needed.
         schema = self._schema(name)
@@ -421,14 +408,15 @@ class S3Storage(Storage):
     def validate_s3_path(self, s3_path: str):
         url_split = urlsplit(s3_path)
         ok_schema = (
-            url_split.scheme in self._clients.keys()
-            or url_split.scheme in self._clients_presigning.keys()
+            url_split.scheme in self._clients or url_split.scheme in self._clients_presigning
         )
         ok_bucket = url_split.netloc != ''
         if not ok_schema or not ok_bucket:
-            raise NotAS3Url(
-                f"The filename {s3_path} is not a full S3 URL. Have you forgotten to set 'upload_to' on the FileField?"
+            msg = (
+                f"The filename {s3_path} is not a full S3 URL. Have you forgotten to set "
+                "'upload_to' on the FileField?"
             )
+            raise NotAS3UrlError(msg)
 
     @_wrap_path_impl
     def generate_filename(self, filename):
@@ -439,7 +427,7 @@ class S3Storage(Storage):
 
     @_wrap_errors
     def meta(self, name):
-        """Returns a dictionary of metadata associated with the key."""
+        """Return a dictionary of metadata associated with the key."""
         schema = self._schema(name)
         return self.s3_client(schema).head_object(**self._object_params(name))
 
@@ -453,7 +441,8 @@ class S3Storage(Storage):
     def copy(self, src_name, dst_name):
         schema = self._schema(src_name)
         self.s3_client(schema).copy_object(
-            CopySource=self._object_params(src_name), **self._object_params(dst_name)
+            CopySource=self._object_params(src_name),
+            **self._object_params(dst_name),
         )
 
     @_read_only_protect
@@ -479,16 +468,14 @@ class S3Storage(Storage):
                 )
             except ClientError:
                 return False
-            else:
-                return "Contents" in results
+            return "Contents" in results
         # This may be a file or a directory. Check if getting the file metadata throws an error.
         try:
             self.meta(name)
         except OSError:
             # It's not a file, but it might be a directory. Check again that it's not a directory.
             return self.exists(name + "/")
-        else:
-            return True
+        return True
 
     def listdir(self, path):
         schema = self._schema(path)
@@ -505,10 +492,13 @@ class S3Storage(Storage):
             Prefix=path,
         )
         for page in pages:
-            for entry in page.get("Contents", ()):
-                files.append(posixpath.relpath(entry["Key"], path))
-            for entry in page.get("CommonPrefixes", ()):
-                dirs.append(posixpath.relpath(entry["Prefix"], path))
+            files.extend(
+                posixpath.relpath(entry["Key"], path) for entry in page.get("Contents", ())
+            )
+            dirs.extend(
+                posixpath.relpath(entry["Prefix"], path) for entry in page.get("CommonPrefixes", ())
+            )
+
         # All done!
         return dirs, files
 
@@ -525,13 +515,12 @@ class S3Storage(Storage):
         params = extra_params.copy() if extra_params else {}
         params.update(self._object_params(name))
         schema = self._schema(name)
-        url = self.s3_client_presigning(schema).generate_presigned_url(
+        # All done!
+        return self.s3_client_presigning(schema).generate_presigned_url(
             ClientMethod=client_method,
             Params=params,
             ExpiresIn=self.settings.AWS_S3_MAX_AGE_SECONDS,
         )
-        # All done!
-        return url
 
     def modified_time(self, name):
         return make_naive(self.meta(name)["LastModified"], timezone.utc)
