@@ -33,7 +33,7 @@ class TestS3Storage(SimpleTestCase):
     @contextmanager
     def save_file(
         self,
-        name=f"s3://1928-django-s3-storage-test/foo.txt",
+        name="s3://1928-django-s3-storage-test/foo.txt",
         content=b"foo",
         storage=default_storage,
     ):
