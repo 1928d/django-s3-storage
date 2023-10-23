@@ -131,11 +131,12 @@ class Settings:
     AWS_SECRET_ACCESS_KEY: str = ""
     AWS_SESSION_TOKEN: str = ""
     # default_s3_settings
+    AWS_S3_BUCKET_NAME: str = 'Deprecated'
     AWS_S3_ADDRESSING_STYLE: str = "auto"
     AWS_S3_ENDPOINTS: dict = field(
         default_factory=lambda: {
             's3': Endpoints(),
-        }
+        },
     )
     AWS_S3_KEY_PREFIX: str = ""
     AWS_S3_MAX_AGE_SECONDS: int = 60 * 60  # 1 hours.
@@ -151,7 +152,6 @@ class Settings:
     AWS_S3_USE_THREADS: bool = True
     AWS_S3_MAX_POOL_CONNECTIONS: int = 10
     AWS_S3_CONNECT_TIMEOUT: int = 60  # 60 seconds
-    AWS_S3_BUCKET_NAME: str = 'Deprecated'
     AWS_S3_READ_ONLY: bool = False
 
     @classmethod
