@@ -1,15 +1,12 @@
-import posixpath
 import time
 from contextlib import contextmanager
 from datetime import timedelta
-from io import StringIO
 from urllib.parse import urlsplit, urlunsplit
 
 import requests
 from django.core.exceptions import ImproperlyConfigured
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
-from django.core.management import CommandError, call_command
 from django.test import SimpleTestCase
 from django.utils import timezone
 from django.utils.timezone import is_naive, make_naive, utc

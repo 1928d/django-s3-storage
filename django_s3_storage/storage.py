@@ -6,24 +6,22 @@ import posixpath
 import shutil
 from contextlib import closing
 from datetime import timezone
-from functools import wraps, partial
+from functools import wraps
 from io import TextIOBase
 from tempfile import SpooledTemporaryFile
-from threading import local
 from urllib.parse import urlsplit
 
 import boto3
-from botocore.client import Config
 from boto3.s3.transfer import TransferConfig
+from botocore.client import Config
 from botocore.exceptions import ClientError
 from django.conf import settings
-from django.core import checks
 from django.core.exceptions import ImproperlyConfigured
 from django.core.files.base import File
 from django.core.files.storage import Storage
 from django.core.signals import setting_changed
 from django.utils.deconstruct import deconstructible
-from django.utils.encoding import filepath_to_uri, force_bytes, force_str
+from django.utils.encoding import force_bytes, force_str
 from django.utils.timezone import make_naive
 
 log = logging.getLogger(__name__)
