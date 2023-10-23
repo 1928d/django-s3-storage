@@ -22,11 +22,6 @@ def helper_old_to_new_name(name) -> str:
 
 
 class TestS3Storage(SimpleTestCase):
-    # def tearDown(self):
-    #     # clean up the dir
-    #     for entry in default_storage.listdir(helper_old_to_new_name("")):
-    #         print(entry)
-    #         # default_storage.delete("/".join(entry))
 
     # Helpers.
 
