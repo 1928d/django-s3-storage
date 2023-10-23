@@ -49,30 +49,26 @@ Use the following settings to configure the S3 file storage. You must provide at
 
 .. code:: python
 
-    # The name of the bucket to store files in.
-    AWS_S3_BUCKET_NAME = ""
+    # The name of the bucket to store files in. Deprecated, will be removed in the future.
+    # Some migration have this configuration, so they need to be squashed before we can remove it.
+    AWS_S3_BUCKET_NAME = "Deprecated"
 
     # How to construct S3 URLs ("auto", "path", "virtual").
     AWS_S3_ADDRESSING_STYLE = "auto"
 
-    # The full URL to the S3 endpoint. Leave blank to use the default region URL.
-    AWS_S3_ENDPOINT_URL = ""
+    # A dictionary of S3 endpoints. The key should be the scheme of the URL. e.g. 's3' for 's3://' or 's3-minio' for 's3-minio://'.
+    # Each endpoint can have an additional URL for presigning. 
+    # This is useful when the internal and external hostname is not the same. For example, s3-minio://minio:9000 and s3-minio://localhost:9000
+    # Leave as None for default region URL
+    AWS_S3_ENDPOINTS={'s3': {endpoint_url: None, endpoint_url_presigning: None}}
 
     # A prefix to be applied to every stored file. This will be joined to every filename using the "/" separator.
     AWS_S3_KEY_PREFIX = ""
-
-    # Whether to enable authentication for stored files. If True, then generated URLs will include an authentication
-    # token valid for `AWS_S3_MAX_AGE_SECONDS`. If False, then generated URLs will not include an authentication token,
-    # and their permissions will be set to "public-read".
-    AWS_S3_BUCKET_AUTH = True
 
     # How long generated URLs are valid for. This affects the expiry of authentication tokens if `AWS_S3_BUCKET_AUTH`
     # is True. It also affects the "Cache-Control" header of the files.
     # Important: Changing this setting will not affect existing files.
     AWS_S3_MAX_AGE_SECONDS = 60 * 60  # 1 hours.
-
-    # A URL prefix to be used for generated URLs. This is useful if your bucket is served through a CDN.
-    AWS_S3_PUBLIC_URL = ""
 
     # If True, then files will be stored with reduced redundancy. Check the S3 documentation and make sure you
     # understand the consequences before enabling.
@@ -125,6 +121,9 @@ Use the following settings to configure the S3 file storage. You must provide at
 
     # Time to raise timeout when submitting a new file
     AWS_S3_CONNECT_TIMEOUT = 60
+
+    # Read-only mode that disables save, delete and rename.
+    AWS_S3_READ_ONLY = False
 
 **Important:** Several of these settings (noted above) will not affect existing files. To sync the new settings to
 existing files, run ``./manage.py s3_sync_meta django.core.files.storage.default_storage``.
