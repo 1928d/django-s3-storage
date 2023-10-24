@@ -511,6 +511,9 @@ class S3Storage(Storage):
             return meta["ContentLength"]
 
     def url(self, name, extra_params=None, client_method="get_object"):
+        if self.settings.AWS_S3_READ_ONLY and client_method != "get_object":
+            raise StorageIsReadOnlyModeError
+
         # Otherwise, generate the URL.
         params = extra_params.copy() if extra_params else {}
         params.update(self._object_params(name))
