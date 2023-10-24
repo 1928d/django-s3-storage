@@ -265,7 +265,7 @@ class S3Storage(Storage):
     def _object_params(self, name):
         url_split = urlsplit(name)
         if not url_split.netloc or url_split.netloc == '':
-            raise RuntimeError
+            raise RuntimeError(f"Missing scheme in S3 URL {name=}")
         return {
             "Bucket": url_split.netloc,
             "Key": self._get_key_name(url_split.path),
