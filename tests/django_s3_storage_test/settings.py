@@ -22,8 +22,6 @@ AWS_S3_KEY_PREFIX = uuid.uuid4().hex
 
 DEFAULT_FILE_STORAGE = "django_s3_storage.storage.S3Storage"
 
-DEBUG = True
-
 # Application definition
 
 INSTALLED_APPS = ("django_s3_storage",)
@@ -35,6 +33,6 @@ INSTALLED_APPS = ("django_s3_storage",)
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
-        "NAME": 'mydatabase',
+        "NAME": os.path.join(BASE_DIR, "db.sqlite3"),
     }
 }
