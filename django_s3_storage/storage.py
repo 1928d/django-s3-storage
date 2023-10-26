@@ -514,11 +514,10 @@ class S3Storage(Storage):
         if self.settings.AWS_S3_READ_ONLY and client_method != "get_object":
             raise StorageIsReadOnlyModeError
 
-        # Otherwise, generate the URL.
         params = extra_params.copy() if extra_params else {}
         params.update(self._object_params(name))
         schema = self._schema(name)
-        # All done!
+
         return self.s3_client_presigning(schema).generate_presigned_url(
             ClientMethod=client_method,
             Params=params,
