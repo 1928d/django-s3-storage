@@ -519,7 +519,7 @@ class S3Storage(Storage):
         try:
             params.update(self._object_params(name))
         except RuntimeError as e:
-            raise NotImplementedError
+            return ''
 
         schema = self._schema(name)
 
