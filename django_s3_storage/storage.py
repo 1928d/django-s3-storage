@@ -515,7 +515,12 @@ class S3Storage(Storage):
             raise StorageIsReadOnlyModeError
 
         params = extra_params.copy() if extra_params else {}
-        params.update(self._object_params(name))
+
+        try:
+            params.update(self._object_params(name))
+        except RuntimeError as e:
+            raise NotImplementedError
+
         schema = self._schema(name)
 
         return self.s3_client_presigning(schema).generate_presigned_url(
