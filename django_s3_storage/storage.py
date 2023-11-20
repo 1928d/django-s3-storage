@@ -514,6 +514,11 @@ class S3Storage(Storage):
         if self.settings.AWS_S3_READ_ONLY and client_method != "get_object":
             raise StorageIsReadOnlyModeError
 
+        # Dirty hack for Alex. Empty files are stored as '-'
+        # TODO: Remove when Alex has been reworked to store missing files as Null
+        if name == '-':
+            return ''
+
         params = extra_params.copy() if extra_params else {}
         params.update(self._object_params(name))
         schema = self._schema(name)
