@@ -514,13 +514,13 @@ class S3Storage(Storage):
         if self.settings.AWS_S3_READ_ONLY and client_method != "get_object":
             raise StorageIsReadOnlyModeError
 
-        params = extra_params.copy() if extra_params else {}
-
-        try:
-            params.update(self._object_params(name))
-        except RuntimeError as e:
+        # Dirty hack for Alex. Empty files are stored as '-'
+        # TODO: Remove when Alex has been reworked to store missing files as Null
+        if name == '-':
             return ''
 
+        params = extra_params.copy() if extra_params else {}
+        params.update(self._object_params(name))
         schema = self._schema(name)
 
         return self.s3_client_presigning(schema).generate_presigned_url(
