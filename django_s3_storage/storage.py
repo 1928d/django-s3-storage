@@ -120,11 +120,11 @@ class Settings:
     AWS_SECRET_ACCESS_KEY: str = ""
     AWS_SESSION_TOKEN: str = ""
     # default_s3_settings
-    AWS_S3_BUCKET_NAME: str = 'Deprecated'
+    AWS_S3_BUCKET_NAME: str = "Deprecated"
     AWS_S3_ADDRESSING_STYLE: str = "auto"
     AWS_S3_ENDPOINTS: dict = field(
         default_factory=lambda: {
-            's3': Endpoints(),
+            "s3": Endpoints(),
         },
     )
     AWS_S3_KEY_PREFIX: str = ""
@@ -177,11 +177,11 @@ class Settings:
 
     def boto3_client_kwargs(self):
         return {
-            'config': self._client_config,
-            'region_name': self.AWS_REGION,
-            'aws_access_key_id': self.AWS_ACCESS_KEY_ID or None,
-            'aws_secret_access_key': self.AWS_SECRET_ACCESS_KEY or None,
-            'aws_session_token': self.AWS_SESSION_TOKEN or None,
+            "config": self._client_config,
+            "region_name": self.AWS_REGION,
+            "aws_access_key_id": self.AWS_ACCESS_KEY_ID or None,
+            "aws_secret_access_key": self.AWS_SECRET_ACCESS_KEY or None,
+            "aws_session_token": self.AWS_SESSION_TOKEN or None,
         }
 
 
@@ -200,9 +200,9 @@ class S3Storage(Storage):
 
             # Primary client
             client_settings = self.settings.boto3_client_kwargs()
-            client_settings['endpoint_url'] = endpoints.endpoint_url
+            client_settings["endpoint_url"] = endpoints.endpoint_url
 
-            self._clients[schema] = self.session.client('s3', **client_settings)
+            self._clients[schema] = self.session.client("s3", **client_settings)
 
             # Presigning client. Create a client for presigning
             # if the endpoint_url_presigning is set to something unique.
@@ -212,8 +212,8 @@ class S3Storage(Storage):
                 and endpoints.endpoint_url_presigning != endpoints.endpoint_url
             ):
                 client_settings = self.settings.boto3_client_kwargs()
-                client_settings['endpoint_url'] = endpoints.endpoint_url_presigning
-                self._clients_presigning[schema] = self.session.client('s3', **client_settings)
+                client_settings["endpoint_url"] = endpoints.endpoint_url_presigning
+                self._clients_presigning[schema] = self.session.client("s3", **client_settings)
             else:
                 self._clients_presigning[schema] = self._clients[schema]
 
@@ -264,7 +264,7 @@ class S3Storage(Storage):
 
     def _object_params(self, name):
         url_split = urlsplit(name)
-        if not url_split.netloc or url_split.netloc == '':
+        if not url_split.netloc or url_split.netloc == "":
             raise RuntimeError(f"Missing scheme in S3 URL {name=}")
         return {
             "Bucket": url_split.netloc,
@@ -379,8 +379,8 @@ class S3Storage(Storage):
             schema = self._schema(name)
             self.s3_client(schema).upload_fileobj(
                 content,
-                put_params.pop('Bucket'),
-                put_params.pop('Key'),
+                put_params.pop("Bucket"),
+                put_params.pop("Key"),
                 ExtraArgs=put_params,
                 Config=self.settings.transfer_config,
             )
@@ -410,7 +410,7 @@ class S3Storage(Storage):
         ok_schema = (
             url_split.scheme in self._clients or url_split.scheme in self._clients_presigning
         )
-        ok_bucket = url_split.netloc != ''
+        ok_bucket = url_split.netloc != ""
         if not ok_schema or not ok_bucket:
             msg = (
                 f"The filename {s3_path} is not a full S3 URL. Have you forgotten to set "
@@ -461,9 +461,9 @@ class S3Storage(Storage):
                 schema = self._schema(name)
                 params = self._object_params(name)
                 results = self.s3_client(schema).list_objects_v2(
-                    Bucket=params['Bucket'],
+                    Bucket=params["Bucket"],
                     MaxKeys=1,
-                    Prefix=params['Key']
+                    Prefix=params["Key"]
                     + "/",  # Add the slash again, since _get_key_name removes it.
                 )
             except ClientError:
@@ -480,14 +480,14 @@ class S3Storage(Storage):
     def listdir(self, path):
         schema = self._schema(path)
         params = self._object_params(path)
-        key = params['Key']
+        key = params["Key"]
         path = "" if key == "." else key + "/"
         # Look through the paths, parsing out directories and paths.
         files = []
         dirs = []
         paginator = self.s3_client(schema).get_paginator("list_objects_v2")
         pages = paginator.paginate(
-            Bucket=params['Bucket'],
+            Bucket=params["Bucket"],
             Delimiter="/",
             Prefix=path,
         )
@@ -516,8 +516,8 @@ class S3Storage(Storage):
 
         # Dirty hack for Alex. Empty files are stored as '-'
         # TODO: Remove when Alex has been reworked to store missing files as Null
-        if name == '-':
-            return ''
+        if name == "-":
+            return ""
 
         params = extra_params.copy() if extra_params else {}
         params.update(self._object_params(name))
