@@ -89,6 +89,7 @@ _UNCOMPRESSED_SIZE_META_KEY = "uncompressed_size"
 class Endpoints:
     endpoint_url: str | None = None
     endpoint_url_presigning: str | None = None
+    aws_config_profile_name: str | None = None
 
 
 class StorageIsReadOnlyModeError(Exception):
@@ -114,11 +115,6 @@ class S3File(File):
 
 @dataclass
 class Settings:
-    # default_auth_settings
-    AWS_REGION: str = "us-east-1"
-    AWS_ACCESS_KEY_ID: str = ""
-    AWS_SECRET_ACCESS_KEY: str = ""
-    AWS_SESSION_TOKEN: str = ""
     # default_s3_settings
     AWS_S3_BUCKET_NAME: str = "Deprecated"
     AWS_S3_ADDRESSING_STYLE: str = "auto"
@@ -167,22 +163,13 @@ class Settings:
         return TransferConfig(use_threads=self.AWS_S3_USE_THREADS)
 
     @property
-    def _client_config(self):
+    def client_config(self):
         return Config(
             s3={"addressing_style": self.AWS_S3_ADDRESSING_STYLE},
             signature_version=self.AWS_S3_SIGNATURE_VERSION,
             max_pool_connections=self.AWS_S3_MAX_POOL_CONNECTIONS,
             connect_timeout=self.AWS_S3_CONNECT_TIMEOUT,
         )
-
-    def boto3_client_kwargs(self):
-        return {
-            "config": self._client_config,
-            "region_name": self.AWS_REGION,
-            "aws_access_key_id": self.AWS_ACCESS_KEY_ID or None,
-            "aws_secret_access_key": self.AWS_SECRET_ACCESS_KEY or None,
-            "aws_session_token": self.AWS_SESSION_TOKEN or None,
-        }
 
 
 @deconstructible
@@ -198,11 +185,14 @@ class S3Storage(Storage):
         for schema, _endpoints in self.settings.AWS_S3_ENDPOINTS.items():
             endpoints: Endpoints = _endpoints
 
-            # Primary client
-            client_settings = self.settings.boto3_client_kwargs()
-            client_settings["endpoint_url"] = endpoints.endpoint_url
+            session = boto3.Session(profile_name=endpoints.aws_config_profile_name)
 
-            self._clients[schema] = self.session.client("s3", **client_settings)
+            # Primary client
+            self._clients[schema] = session.client(
+                service_name="s3",
+                endpoint_url=endpoints.endpoint_url,
+                config=self.settings.client_config,
+            )
 
             # Presigning client. Create a client for presigning
             # if the endpoint_url_presigning is set to something unique.
@@ -211,9 +201,11 @@ class S3Storage(Storage):
                 endpoints.endpoint_url_presigning
                 and endpoints.endpoint_url_presigning != endpoints.endpoint_url
             ):
-                client_settings = self.settings.boto3_client_kwargs()
-                client_settings["endpoint_url"] = endpoints.endpoint_url_presigning
-                self._clients_presigning[schema] = self.session.client("s3", **client_settings)
+                self._clients_presigning[schema] = session.client(
+                    service_name="s3",
+                    endpoint_url=endpoints.endpoint_url_presigning,
+                    config=self.settings.client_config,
+                )
             else:
                 self._clients_presigning[schema] = self._clients[schema]
 
@@ -237,7 +229,6 @@ class S3Storage(Storage):
 
         self._kwargs_settings = kwargs
 
-        self.session = boto3.Session()
         self._setup()
 
         # Re-initialize the storage if an AWS setting changes.
